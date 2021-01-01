@@ -1,0 +1,150 @@
+Bestudeerde code voor curses: 
+
+#https://docs.python.org/3/library/curses.html
+#https://docs.python.org/3/howto/curses.html
+#https://pubs.opengroup.org/onlinepubs/7908799/xcurses/curs_set.html
+#https://linux.die.net/man/3/newwin
+#https://linux.die.net/man/3/addch
+#http://www.cs.ukzn.ac.za/~hughm/os/notes/ncurses.html
+#https://www.programcreek.com/python/example/5393/curses.KEY_RIGHT
+#https://www.programiz.com/python-programming/methods/list/insert
+#https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/scanw.html
+#
+#
+#
+#
+#
+#                       The screen (stdscr)
+#       (0,0)*----------------------------------* (0, COLUMNS-1)
+#             |                                  |
+#             |                                  |
+#             |    (y0,x0)                       |
+#             |      ---------------             |
+#             |      |             |             |
+#             |      |             |             |
+#             |      |     win     |nlines       |
+#             |      |             |             |
+#             |      |             |             |
+#             |      |             |             |
+#             |      ---------------             |
+#             |          ncols                   |
+#             |                                  |
+#             *----------------------------------*
+#       (LINES-1, 0)                              (LINES-1, COLUMNS-1) 
+
+#Maak gebruik van curses library en random 
+import random
+import curses
+
+
+#starten van de curses app       
+Slang = curses.initscr()
+#The curs_set() function sets the appearance of the cursor based on the value of visibility:
+curses.curs_set(0) # DUS 0 IS onzichtbaar, 1 nomral mode, 2 high visibility mode.
+
+vensterhoogte, vensterbreedte = Slang.getmaxyx()
+
+#heb een venster nodig waarin dat ik ga de slang laten bewegen 
+#The newwin() function creates a new window of a given size, returning the new window object.
+venster = curses.newwin(vensterhoogte,vensterbreedte, 0, 0) # verwijderen delwin, bewegen mvwin, subwin creates and returns een pointer.
+venster.keypad(1)
+venster.timeout(100)
+
+#Waar wil ik starten ? 
+
+#breedte delen door 4 van de venster
+slang_x = vensterbreedte/4 
+slang_y = vensterhoogte/2
+
+#De slang zelf 
+   
+# Maak gebruik van een list
+slang = [
+    [slang_y, slang_x   ],
+    [slang_y, slang_x-1 ],
+    [slang_y, slang_x-2 ]
+    ]
+
+eten = [vensterhoogte/2, vensterbreedte/2]
+
+#Niet nodig in plaats een bal 
+#venster.addch(int(eten[0]), int(eten[1]), curses.ACS_PI)
+  
+
+
+#Naar waar gaat je slang gaan vanaf begin
+key = curses.KEY_RIGHT
+#Daarna de richting zelf van de slang
+#The getch() method returns an integer; if it’s between 0 and 255, it represents the ASCII code of the key pressed.
+
+#Zo kan ik deze while lus oproepen vanuit de main om de beweging van de slang te starten.
+    
+while True: 
+    #wat is de volgende key
+    next_key = venster.getch()
+    #geeft mij niets of de volgende key 
+    key = key if next_key == -1 else next_key 
+
+    #  Daarna een check als je de game bent verloren. 
+    #  De dimensies aangeven om de slang te verwijderen, => verlies 
+    #                      VAN boven         x posite Links van de breedte van de v          slang in zich zelf 
+    if slang[0][0] in [0, vensterhoogte] or slang[0][1] in [0, vensterbreedte] or slang[0] in slang[1:]:
+         #sluiten van  de raam 
+         curses.endwin()
+         quit()
+    # Daarna hebben we een nieuwe hoofd nodig
+    #vertrkken van de oude
+    nieuwe_hoofd = [slang[0][0], slang[0][1] ]
+
+    # De beweging van de slang zelf in functie van de keys.
+
+    #Neem de hoogte positie en voeg er eentje bij
+    if key == curses.KEY_DOWN:
+        nieuwe_hoofd[0] +=1     
+
+    #Neem de hoogte posite min eentje 
+    if key == curses.KEY_UP:
+        nieuwe_hoofd[0] -=1
+            
+    #Neem de breedte positie min eentje
+    if key == curses.KEY_LEFT:
+        nieuwe_hoofd[1] -=1
+
+    #Neem de breedte positie plus eentje
+    if key == curses.KEY_RIGHT:
+        nieuwe_hoofd[1] +=1
+
+    # Maak gebruik van insert() om de list te updaten, het reurnt niets.
+
+    slang.insert(0, nieuwe_hoofd)
+
+    #gelijk aardig structuur bij het aanraken van de ball, als er iets gebeurt, 
+    # moet de slang list vergroot worden.
+    if slang[0] == eten: 
+        eten = None
+        #We moeten dan een nieuwe eten selecteren
+        while eten is None:
+            nieuweten = [
+            #kies een niewe random  locatie voor het eten
+            random.randint(1, vensterhoogte-1 ),
+            random.randint(1, vensterbreedte-1 )
+            ]
+            # Als controle als de slang er niet over is ander moet de loop opnieuw uitgevoerd worden.
+            eten = nieuweten if nieuweten not in slang else None 
+            #Het effectief gaan toevoegen
+        venster.addch(eten[0], eten[1], curses.ACS_PI)
+
+
+
+    else: 
+    # The pop() method removes the element at the specified position.
+        tail = slang.pop()
+        venster.addch(int(tail[0]), int(tail[1]), ' ')
+
+    #Voeg de slang aan de venster door gerbuik te maken van de ASC_CKBOARD
+    venster.addch(int(slang[0][0]), int(slang[0][1]), curses.ACS_CKBOARD)
+
+                            
+
+
+

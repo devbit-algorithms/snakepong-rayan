@@ -1,0 +1,301 @@
+import curses
+import turtle #Gebruik ik voor de bal 
+from curses import KEY_RIGHT, KEY_LEFT, KEY_DOWN, KEY_UP
+# ider keer dat de het eten word gegeten willen we die op een ander positie.
+from random import randint
+
+# Defienren van de nodig variables 
+WIDTH = 35 # Totale game cell lengte en hoogte 
+HEIGHT = 40
+MAX_X = WIDTH - 2 # Binnen de box zelf zodat die niet tegen de wanden zit.
+MAX_Y = HEIGHT - 2
+SNAKE_LENGTH = 5 
+SNAKE_X = SNAKE_LENGTH + 1 
+SNAKE_Y = 3
+TIMEOUT = 100 # Hoe snel dat de game verloopt
+
+#Mosue motion 
+
+#https://pyglet.readthedocs.io/en/latest/programming_guide/mouse.html
+
+
+#https://docs.python.org/3/library/curses.html
+#https://docs.python.org/3/howto/curses.html
+#https://pubs.opengroup.org/onlinepubs/7908799/xcurses/curs_set.html
+#https://linux.die.net/man/3/newwin
+#https://linux.die.net/man/3/addch
+#http://www.cs.ukzn.ac.za/~hughm/os/notes/ncurses.html
+#https://www.programcreek.com/python/example/5393/curses.KEY_RIGHT
+#https://www.programiz.com/python-programming/methods/list/insert
+#https://tldp.org/HOWTO/NCURSES-Programming-HOWTO/scanw.html
+#http://www.cs.kent.edu/~ruttan/sysprog/lectures/curses.pdf
+#https://docs.python.org/3/library/curses.html
+#
+#
+#
+#
+#                       The screen (stdscr)
+#       (0,0)*----------------------------------* (0, COLUMNS-1)
+#             |                                  |
+#             |                                  |
+#             |    (y0,x0)                       |
+#             |      ---------------             |
+#             |      |             |             |
+#             |      |             |             |
+#             |      |     win     |nlines       |
+#             |      |             |             |
+#             |      |             |             |
+#             |      |             |             |
+#             |      ---------------             |
+#             |          ncols                   |
+#             |                                  |
+#             *----------------------------------*
+#       (LINES-1, 0)                              (LINES-1, COLUMNS-1) 
+
+#http://115.28.130.42/python3.2/howto/curses.html
+
+# slang object
+class Snake(object):
+    #Reverse fucntie want je wilt niet dat de head, de body raakt dus soort van catch.
+    #De snake body moet de head volgen
+    REV_DIR_MAP = {
+        KEY_UP: KEY_DOWN, KEY_DOWN: KEY_UP,
+        KEY_LEFT: KEY_RIGHT, KEY_RIGHT: KEY_LEFT,
+    }
+    #attributen bij de start
+    def __init__(self, x, y, window): 
+        self.body_list = [] # in deze array zal de snake body zich bevinden. voeg de body_list bij de snake object
+        self.hit_score = 0 # score 
+        self.timeout = TIMEOUT 
+
+        # We maken gebruik van append om de range van de body object te appenden voor de snakes body
+        for i in range(SNAKE_LENGTH, 0, -1):
+            self.body_list.append(Body(x - i, y))
+
+        #Hier defineer je de hoofd van de snake appereinace.
+        self.body_list.append(Body(x, y, '0'))
+
+        #Defineren de window 
+        self.window = window
+        #defineren de start richting bij het initalsieren
+        self.direction = KEY_RIGHT
+        #Zal helpen bepralen waar dat de laaste postie van de hoofd van de snake was+
+        self.last_head_coor = (x, y) 
+
+        # De richtign map, Het is net als een object waarin dat er ider KeY effectief iets doet.
+        self.direction_map = {
+            KEY_UP: self.move_up,
+            KEY_DOWN: self.move_down,
+            KEY_LEFT: self.move_left,
+            KEY_RIGHT: self.move_right
+        }
+
+#De @ ervoor diend om binnen het classe de functies te laten 
+# werken als getters, setters, or deleters.
+# Als je er later aan wilt toegeraken, maak gebruik van property 
+    @property 
+    def score(self): 
+        return 'Score : {}'.format(self.hit_score) #we willen de hit_score toevoegen tussen de brackets
+
+
+    # We maken gebruik van extend om meerdere list te gaan toevoegen
+    def add_body(self, body_list):  
+        self.body_list.extend(body_list) # we voegen de bodylsit aan de snake 
+
+
+    # Reageert bij het erop gaan van de eten 
+    def eat_food(self, food):
+        #reset de eten, zodat het altijd udpates 
+        food.reset()
+        #nieuwe coordinaat, we willen de meest resent coordinaat
+        body = Body(self.last_head_coor[0], self.last_head_coor[1])
+
+        # Voeg een varaible toe aan de body van de snake
+        self.body_list.insert(-1, body)
+
+        #updaten de score van de game 
+        self.hit_score += 1
+        if self.hit_score % 3 == 0:
+            self.timeout -= 5 # timer functie 
+            self.window.timeout(self.timeout)
+
+
+ # Bij het oproepen van deze functie, gaan we de game laten weten als de slang zichzelf heeft aangeraakt.
+    @property
+    def collided(self):
+        return any([body.coor == self.head.coor
+                    for body in self.body_list[:-1]])
+
+    #@property 
+  #  def OutOfMarge(self):
+        #return any([snake.head.x == ])
+
+    # Uodaten van de postie van de snake body 
+    def update(self):
+        last_body = self.body_list.pop(0)
+        last_body.x = self.body_list[-1].x
+        last_body.y = self.body_list[-1].y
+        self.body_list.insert(-1, last_body)
+        self.last_head_coor = (self.head.x, self.head.y)
+        self.direction_map[self.direction]()
+
+    # richting aanpassen van de snake 
+    def change_direction(self, direction):
+        if direction != Snake.REV_DIR_MAP[self.direction]:
+            self.direction = direction
+
+    #render, updaten van de coordianten 
+    def render(self):
+        for body in self.body_list:
+            self.window.addstr(body.y, body.x, body.char)
+
+    # hoofd van de snake loop voor de body 
+    @property
+    def head(self):
+        return self.body_list[-1]
+
+    #
+    @property
+    def coor(self):
+        return self.head.x, self.head.y
+
+
+    def move_up(self):
+        self.head.y -= 1
+        if self.head.y < 1:
+            self.head.y = MAX_Y
+
+    def move_down(self):
+        self.head.y += 1
+        if self.head.y > MAX_Y:
+            self.head.y = 1
+
+    def move_left(self):
+        self.head.x -= 1
+        if self.head.x < 1:
+            self.head.x = MAX_X
+
+    def move_right(self):
+        self.head.x += 1
+        if self.head.x > MAX_X:
+            self.head.x = 1
+
+class Body(object):
+    #Verwijderen voorhaande body en starten opnieuw 
+    #Hoe zal de lichaam van de snake eruit zien 
+    def __init__(self, x, y, char='='):
+        #Initatilesern van de body 
+        self.x = x
+        self.y = y
+        self.char = char
+
+    # decoratie functie 
+    @property
+    def coor(self):
+        return self.x, self.y
+
+
+class Food(object):
+    #Het eten zelf de karakter, dit wil je veranderen naar een element die beweegt binnen de ruimte 
+    def __init__(self, window, char='&'):
+
+        #Random positie bij het initialiseren waarin die er zal zitten.
+        self.x = randint(1, MAX_X)
+        self.y = randint(1, MAX_Y)
+
+        # gewoon karakters en de venster 
+        self.char = char
+        self.window = window
+    
+
+    def render(self):
+        self.window.addstr(self.y, self.x, self.char)
+    #Maak gberuik van de addstr fucntie om iets de coordinaten te updaten en char.
+    #Je wilt het gaan teovoegen op de window en wat precies, de argument zelf.
+
+    def reset(self):
+        # Bij het keizen van een nieuwe coordinaat, moet het effectief gerest worden.
+        self.x = randint(1, MAX_X)
+        self.y = randint(1, MAX_Y)
+
+
+#deze file is de main file voor de programma.
+if __name__ == '__main__': # Het initaitiseren
+    curses.initscr() # init van curses 
+    # De snake die beweegt word gerenderd en removed, constant.
+
+    #Start declaratie (0,0)
+    window = curses.newwin(HEIGHT, WIDTH, 0, 0)
+    window.timeout(TIMEOUT)
+    window.keypad(1)
+    #Btekend ecoching karakters of 
+    curses.noecho()
+    curses.curs_set(0)
+    window.border(0)
+    
+    #We nemen de de slang en de eten object 
+    snake = Snake(SNAKE_X, SNAKE_Y, window)
+
+    # Initaliserrn van het obejct food als ster en op random plaats in de window  
+    food = Food(window, '*') 
+
+    # Zo lang onze game alles true returnt, gaan we 
+    while True: 
+        # window clearen 
+        window.clear()
+        # De border op 0 
+        window.border(0)
+        # render de snake 
+        snake.render()
+        # render de eten
+        food.render()
+
+        window.addstr(0, 5, snake.score)
+        event = window.getch()
+
+        
+        ''' Here we set some logic for the game. at this point when we boot up
+        in the terminal with python snake.py, we can see the score, the snake,
+        and the food. but there is no animation '''
+
+        #2 event = windo.getch if == 27 break
+        # if event == 27:
+         #   break
+
+         # Als die tegen de rand zit stop het. boven                       links                             
+        
+        #3 this allows us to move the snakes direction. if saved and ran here, snake can change direction, but cannot eat food
+        if event in [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT]:
+            snake.change_direction(event)
+
+        #4 this allows the snake to eat the food, and then reset see line 50
+        if snake.head.x == food.x and snake.head.y == food.y:
+            snake.eat_food(food)
+
+        #5 
+        if event == 32:
+            key = -1
+            while key != 32:
+                key = window.getch()
+
+        #0 we grab the snake variable, which is rendered a few lines above,
+        # and we call the update function from line 64
+        snake.update()
+
+        
+        #1 if snake collides from funcion line 60, break. https://www.tutorialspoint.com/python/python_break_statement.htm
+        if snake.collided:
+            break
+
+    # Dit is nodig zodat, als niets is true, dan zal de game stoppen, dus het is een while else 
+    curses.endwin()
+
+
+
+
+
+
+
+
+
+
